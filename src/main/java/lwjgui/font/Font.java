@@ -1,46 +1,69 @@
 package lwjgui.font;
 
 import static org.lwjgl.nanovg.NanoVG.nvgCreateFontMem;
+import static org.lwjgl.system.MemoryUtil.memAlloc;
+import static org.lwjgl.system.MemoryUtil.memFree;
+import static org.lwjgl.system.MemoryUtil.memRealloc;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.util.ArrayList;
+import java.nio.channels.Channels;
+import java.nio.channels.FileChannel;
+import java.nio.channels.ReadableByteChannel;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
 
-import org.lwjgl.glfw.GLFW;
 import org.lwjgl.nanovg.NanoVG;
 
-import lwjgui.LWJGUI;
 import lwjgui.scene.Context;
-import lwjgui.scene.Window;
 
 public class Font {
-	public static Font SANS = new Font("lwjgui/scene/layout/", "Roboto-Regular.ttf", "Roboto-Bold.ttf", "Roboto-Italic.ttf", "Roboto-Light.ttf");
-	public static Font COURIER = new Font("lwjgui/scene/layout/", "Courier-New-Regular.ttf", "Courier-New-Bold.ttf", "Courier-New-Italic.ttf", null);
-	public static Font CONSOLAS = new Font("lwjgui/scene/layout/", "Consolas-Regular.ttf", "Consolas-Bold.ttf", "Consolas-Italic.ttf", null);
-	public static Font ARIAL = new Font("lwjgui/scene/layout/", "Arial-Unicode.ttf");
-	public static Font DINGBAT = new Font("lwjgui/scene/layout/", "ErlerDingbats.ttf");
+	public static Font SANS;
+	public static Font COURIER;
+	public static Font CONSOLAS;
+	public static Font ARIAL;
+	public static Font DINGBAT;
 
 	private static ByteBuffer fallbackSansEmoji;
 	private static ByteBuffer fallbackRegularEmoji;
 	private static ByteBuffer fallbackArial;
 	private static ByteBuffer fallbackEntypo;
-	
-	static {
+
+	public static void initFonts() {
 		try {
-			fallbackSansEmoji		= resourceToByteBuffer("lwjgui/scene/layout/OpenSansEmoji.ttf");
-			fallbackRegularEmoji	= resourceToByteBuffer("lwjgui/scene/layout/NotoEmoji-Regular.ttf");
-			fallbackArial			= resourceToByteBuffer("lwjgui/scene/layout/Arial-Unicode.ttf");
-			fallbackEntypo			= resourceToByteBuffer("lwjgui/scene/layout/entypo.ttf");
-		}catch(Exception e) {
-			//
+			fallbackSansEmoji = ioResourceToByteBuffer("lwjgui/scene/layout/OpenSansEmoji.ttf", 561512 + 5);
+			fallbackRegularEmoji = ioResourceToByteBuffer("lwjgui/scene/layout/NotoEmoji-Regular.ttf", 418804 + 5);
+			fallbackArial = ioResourceToByteBuffer("lwjgui/scene/layout/Arial-Unicode.ttf", 23275812 + 5);
+			fallbackEntypo = ioResourceToByteBuffer("lwjgui/scene/layout/entypo.ttf", 35392 + 5);
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
+
+		SANS = new Font("lwjgui/scene/layout/", "Roboto-Regular.ttf", "Roboto-Bold.ttf", "Roboto-Italic.ttf",
+				"Roboto-Light.ttf");
+		COURIER = new Font("lwjgui/scene/layout/", "Courier-New-Regular.ttf", "Courier-New-Bold.ttf",
+				"Courier-New-Italic.ttf", null);
+		CONSOLAS = new Font("lwjgui/scene/layout/", "Consolas-Regular.ttf", "Consolas-Bold.ttf", "Consolas-Italic.ttf",
+				null);
+		ARIAL = new Font("lwjgui/scene/layout/", "Arial-Unicode.ttf");
+		DINGBAT = new Font("lwjgui/scene/layout/", "ErlerDingbats.ttf");
+	}
+
+	public static void disposeFonts() {
+		SANS.dispose();
+		COURIER.dispose();
+		CONSOLAS.dispose();
+		ARIAL.dispose();
+		DINGBAT.dispose();
+		memFree(fallbackSansEmoji);
+		memFree(fallbackRegularEmoji);
+		memFree(fallbackArial);
+		memFree(fallbackEntypo);
 	}
 	
 	private String fontPath;
@@ -48,206 +71,167 @@ public class Font {
 	private String fontNameBold;
 	private String fontNameLight;
 	private String fontNameItalic;
-	private HashMap<Long,String> fontDataRegular = new HashMap<Long,String>();
-	private HashMap<Long,String> fontDataBold = new HashMap<Long,String>();
-	private HashMap<Long,String> fontDataLight = new HashMap<Long,String>();
-	private HashMap<Long,String> fontDataItalic = new HashMap<Long,String>();
-	private ArrayList<ByteBuffer> bufs = new ArrayList<ByteBuffer>();
-	
+	private Map<String, ByteBuffer> fontsBuffer = new HashMap<>();
+
 	/**
 	 * Creates a new font with the given settings.
 	 * 
-	 * @param fontPath - the folder path of the font files
-	 * @param regularFileName - the filename of the regular font TTF (e.g. fontName.ttf)
-	 * @param boldFileName - the filename of the bold font TTF
-	 * @param italicFileName - the filename of the italic font TTF
-	 * @param lightFileName - the filename of the light font TTF
+	 * @param fontPath        - the folder path of the font files
+	 * @param regularFileName - the filename of the regular font TTF (e.g.
+	 *                        fontName.ttf)
+	 * @param boldFileName    - the filename of the bold font TTF
+	 * @param italicFileName  - the filename of the italic font TTF
+	 * @param lightFileName   - the filename of the light font TTF
 	 */
-	public Font(String fontPath, String regularFileName, String boldFileName, String italicFileName, String lightFileName) {
+	public Font(String fontPath, String regularFileName, String boldFileName, String italicFileName,
+			String lightFileName) {
 		this.fontPath = fontPath;
 		this.fontNameRegular = regularFileName;
 		this.fontNameBold = boldFileName;
 		this.fontNameLight = lightFileName;
 		this.fontNameItalic = italicFileName;
-	}	
+		this.loadFonts();
+	}
+
 	/**
-	 * Creates a new font with the given settings. Only the regular font is set and made available.
+	 * Creates a new font with the given settings. Only the regular font is set and
+	 * made available.
 	 * 
-	 * @param fontPath - the folder path of the font files
-	 * @param regularFileName - the filename of the regular font TTF (e.g. fontName.ttf)
+	 * @param fontPath        - the folder path of the font files
+	 * @param regularFileName - the filename of the regular font TTF (e.g.
+	 *                        fontName.ttf)
 	 */
-	
+
 	public Font(String fontPath, String regularFileName) {
 		this.fontPath = fontPath;
 		this.fontNameRegular = regularFileName;
+		this.loadFonts();
 	}
 
-	/**
-	 * Manually triggers the loading of this Font's ttf files (where normally they're loaded only when they're needed)
-	 * 
-	 * @param loadFallbacks - if true, default fallback fonts that come with LWJGUI will be set to the font.
-	 * @return this Font object
-	 */
-	public Font load(boolean loadFallbacks) {
-		loadFont(fontPath, fontNameRegular, fontDataRegular, loadFallbacks);
-		loadFont(fontPath, fontNameBold, fontDataBold, loadFallbacks);
-		loadFont(fontPath, fontNameLight, fontDataLight, loadFallbacks);
-		loadFont(fontPath, fontNameItalic, fontDataItalic, loadFallbacks);
-		return this;
-	}
-	
-	private static InputStream inputStream(String path) throws IOException {
-		InputStream stream;
-		File file = new File(path);
-		if (file.exists() && file.isFile()) {
-			stream = new FileInputStream(file);
-		} else {
-			stream = Thread.currentThread().getContextClassLoader().getResourceAsStream(path);
+	public void dispose() {
+		for (ByteBuffer byteBuffer : fontsBuffer.values()) {
+			memFree(byteBuffer);
 		}
-		return stream;
 	}
-	
-	private static byte[] toByteArray(InputStream stream) {
-		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
 
-		int nRead;
-		byte[] data = new byte[16384];
+	public void loadIntoContext(Context context) {
+		long vg = context.getNVG();
+		for (Entry<String, ByteBuffer> font : fontsBuffer.entrySet()) {
+			int fontCallback = nvgCreateFontMem(vg, font.getKey(), font.getValue(), 0);
+			addFallback(vg, fontCallback, "sansemoji", fallbackSansEmoji);
+			addFallback(vg, fontCallback, "regularemoji", fallbackRegularEmoji);
+			addFallback(vg, fontCallback, "arial", fallbackArial);
+			addFallback(vg, fontCallback, "entypo", fallbackEntypo);
+		}
+	}
 
+	private void addFallback(long vg, int fontCallback, String name, ByteBuffer fontData) {
+		NanoVG.nvgAddFallbackFontId(vg, fontCallback, nvgCreateFontMem(vg, name, fontData, 0));
+	}
+
+	public void loadFonts() {
+		loadFont(fontPath, fontNameRegular);
+		loadFont(fontPath, fontNameBold);
+		loadFont(fontPath, fontNameLight);
+		loadFont(fontPath, fontNameItalic);
+	}
+
+	private void loadFont(String fontPath, String loadName) {
+		if (loadName == null)
+			return;
+		String path = fontPath + loadName;
 		try {
-			while ((nRead = stream.read(data, 0, data.length)) != -1) {
-				buffer.write(data, 0, nRead);
-			}
-			buffer.flush();
+			ByteBuffer buf = ioResourceToByteBuffer(path, 1024 * 1024);
+			fontsBuffer.put(loadName, buf);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-
-		return buffer.toByteArray();
 	}
-
-	/**
-	 * Loads the resource via ByteBuffer
-	 * @param path
-	 * @return
-	 * @throws IOException
-	 */
-	public static ByteBuffer resourceToByteBuffer(String path) throws IOException {
-		ByteBuffer data = null;
-		InputStream stream = inputStream(path);
-		if (stream == null) {
-			throw new FileNotFoundException(path);
-		}
-		byte[] bytes = toByteArray(stream);
-		data = ByteBuffer.allocateDirect(bytes.length).order(ByteOrder.nativeOrder()).put(bytes);
-		data.flip();
-		return data;
-	}
-
-	/**
-	 * Loads a given Font
-	 * @param fontPath
-	 * @param loadName
-	 * @param suffix
-	 * @param map
-	 */
-	private void loadFont(String fontPath, String loadName, HashMap<Long, String> map, boolean loadFallbacks) {
-		if (loadName == null) {
-			return;
-		}
-		
-		Window window = LWJGUI.getWindowFromContext(GLFW.glfwGetCurrentContext());
-		Context context = window.getContext();
-		long vg = context.getNVG();
-		int fontCallback;
-		
-		try {
-			String path = fontPath + loadName;
-			
-			// Create normal font
-			ByteBuffer buf = resourceToByteBuffer(path);
-			fontCallback = nvgCreateFontMem(vg, loadName, buf, 0);
-			map.put(vg, loadName);
-			bufs.add(buf);
-			
-			// Fallback emoji fonts
-			if (loadFallbacks) {
-				addFallback(vg, fontCallback, "sansemoji", fallbackSansEmoji);
-				addFallback(vg, fontCallback, "regularemoji", fallbackRegularEmoji);
-				addFallback(vg, fontCallback, "arial", fallbackArial);
-				addFallback(vg, fontCallback, "entypo", fallbackEntypo);
-			}
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void addFallback(long vg, int fontCallback, String name, ByteBuffer fontData) {
-        NanoVG.nvgAddFallbackFontId(vg, fontCallback, nvgCreateFontMem(vg, name, fontData, 0));
-        bufs.add(fontData);
-    }
 
 	public String getFont() {
-		for (int i = 0; i < bufs.size(); i++) {
-			bufs.get(i);
-		}
 		return getFont(FontStyle.REGULAR);
 	}
 
 	/**
-	 * Gets the font with the given style. If the font hasn't been loaded yet, this function will do so.
+	 * Gets the font with the given style. If the font hasn't been loaded yet, this
+	 * function will do so.
 	 * 
 	 * @param style
 	 * @return
 	 */
 	public String getFont(FontStyle style) {
-		Window window = LWJGUI.getWindowFromContext(GLFW.glfwGetCurrentContext());
-		if ( window == null )
-			return null;
-		
-		Context context = window.getContext();
-		long vg = context.getNVG();
-
-		HashMap<Long,String> using = fontDataRegular;
-		
-		if (fontDataRegular.get(vg) == null) {
-			load(true);
+		switch (style) {
+		case BOLD:
+			return fontNameBold;
+		case ITALIC:
+			return fontNameItalic;
+		case LIGHT:
+			return fontNameLight;
+		case REGULAR:
+			return fontNameRegular;
 		}
-
-		if ( style == FontStyle.BOLD && fontDataBold.get(vg) != null ) {
-			using = fontDataBold;
-		}
-		
-		if ( style == FontStyle.LIGHT && fontDataLight.get(vg) != null ) {
-			using = fontDataLight;
-		}
-		
-		if ( style == FontStyle.ITALIC && fontDataItalic.get(vg) != null ) {
-			using = fontDataItalic;
-		}
-		
-		return using.get(vg);
+		return "";
 	}
-	
-	public float[] getTextBounds(Context context, String string, FontStyle style, double size, float[] bounds) {		
+
+	public float[] getTextBounds(Context context, String string, FontStyle style, double size, float[] bounds) {
 		if (context == null) {
 			return bounds;
 		}
-		
+
 		String font = getFont(style);
-		
+
 		if (font == null) {
 			return bounds;
 		}
-		
-		NanoVG.nvgFontSize(context.getNVG(), (float)size);
+
+		NanoVG.nvgFontSize(context.getNVG(), (float) size);
 		NanoVG.nvgFontFace(context.getNVG(), font);
-		NanoVG.nvgTextAlign(context.getNVG(), NanoVG.NVG_ALIGN_LEFT|NanoVG.NVG_ALIGN_TOP);
-		
+		NanoVG.nvgTextAlign(context.getNVG(), NanoVG.NVG_ALIGN_LEFT | NanoVG.NVG_ALIGN_TOP);
+
 		if (string != null) {
 			NanoVG.nvgTextBounds(context.getNVG(), 0, 0, string, bounds);
 		}
-		
+
 		return bounds;
 	}
+
+	public static ByteBuffer ioResourceToByteBuffer(String resource, int bufferSize) throws IOException {
+		ByteBuffer buffer;
+
+		File file = new File(resource);
+		if (file.isFile()) {
+			FileInputStream fis = new FileInputStream(file);
+			FileChannel fc = fis.getChannel();
+
+			buffer = memAlloc((int) fc.size() + 1);
+
+			while (fc.read(buffer) != -1)
+				;
+
+			fis.close();
+			fc.close();
+		} else {
+			int size = 0;
+			buffer = memAlloc(bufferSize);
+			try (InputStream source = Thread.currentThread().getContextClassLoader().getResourceAsStream(resource)) {
+				if (source == null)
+					throw new FileNotFoundException(resource);
+				try (ReadableByteChannel rbc = Channels.newChannel(source)) {
+					while (true) {
+						int bytes = rbc.read(buffer);
+						if (bytes == -1)
+							break;
+						size += bytes;
+						if (!buffer.hasRemaining())
+							buffer = memRealloc(buffer, size * 2);
+					}
+				}
+			}
+			buffer = memRealloc(buffer, size + 1);
+		}
+		buffer.put((byte) 0);
+		buffer.flip();
+		return buffer;
+	}
+
 }

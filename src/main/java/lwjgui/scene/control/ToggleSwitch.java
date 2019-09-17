@@ -108,11 +108,11 @@ public class ToggleSwitch extends Labeled implements Toggle {
 						if ( isSelected() ) {
 							double ox = (track.getWidth()-button.getWidth())/2;
 							double oy = track.getHeight()/2;
-							LWJGUIUtil.drawText("ON", Font.SANS, FontStyle.BOLD, 16, color, getX()+ox, getY()+oy, Pos.CENTER);
+							LWJGUIUtil.drawText("ON", Font.SANS, FontStyle.BOLD, 16, color, getX()+ox, getY()+oy, Pos.CENTER, super.cached_context);
 						} else {
 							double ox = button.getWidth()+(track.getWidth()-button.getWidth())/2;
 							double oy = track.getHeight()/2;
-							LWJGUIUtil.drawText("OFF", Font.SANS, FontStyle.BOLD, 16, color, getX()+ox, getY()+oy, Pos.CENTER);
+							LWJGUIUtil.drawText("OFF", Font.SANS, FontStyle.BOLD, 16, color, getX()+ox, getY()+oy, Pos.CENTER,super.cached_context);
 						}
 					}
 				}

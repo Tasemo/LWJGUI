@@ -65,7 +65,7 @@ public class GearsDemo extends LWJGUIApplication {
 		window.show();
 
 		// Start the gears application
-		window.setRenderingCallback(new GearsApplication(null));
+		window.getTaskManager().addTaskMainThread(() -> window.setRenderingCallback(new GearsApplication(null)));
 	}
 	
 	static class GearsApplication implements Renderer {

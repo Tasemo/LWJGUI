@@ -3,12 +3,13 @@ package lwjgui;
 import static org.lwjgl.glfw.GLFW.glfwInit;
 import static org.lwjgl.glfw.GLFW.glfwTerminate;
 
-import org.lwjgl.glfw.GLFW;
-
+import lwjgui.font.Font;
 import lwjgui.scene.Window;
 
 /**
- * A utility class that quickly assembles a LWJGUI program. To implement this into your project, simply extend this class and call startProgram() in the main method.
+ * A utility class that quickly assembles a LWJGUI program. To implement this
+ * into your project, simply extend this class and call startProgram() in the
+ * main method.
  */
 public abstract class LWJGUIApplication {
 	/**
@@ -17,8 +18,8 @@ public abstract class LWJGUIApplication {
 	public static boolean ModernOpenGL = true;
 
 	/**
-	 * Starts the given LWJGUI-based program.
-	 * The entry point of the program is the same class that calls this method.
+	 * Starts the given LWJGUI-based program. The entry point of the program is the
+	 * same class that calls this method.
 	 * 
 	 * @param args - the args passed through the main method
 	 */
@@ -46,7 +47,7 @@ public abstract class LWJGUIApplication {
 
 		try {
 			Class<?> theClass = Class.forName(callingClassName, true, Thread.currentThread().getContextClassLoader());
-			launch((LWJGUIApplication) theClass.newInstance(),args);
+			launch((LWJGUIApplication) theClass.newInstance(), args);
 		} catch (ClassNotFoundException e) {
 			e.printStackTrace();
 		} catch (InstantiationException e) {
@@ -55,59 +56,60 @@ public abstract class LWJGUIApplication {
 			e.printStackTrace();
 		}
 	}
-	
+
 	/**
 	 * Starts the given LWJGUI-based program.
 	 * 
-	 * @param program - a class that extends this one, meant to be the root of the program
-	 * @param args - the args passed through the main method
+	 * @param program - a class that extends this one, meant to be the root of the
+	 *                program
+	 * @param args    - the args passed through the main method
 	 */
 	public static void launch(LWJGUIApplication program, String[] args) {
-		//Restarts the JVM if necessary on the first thread to ensure Mac compatibility
+		// Restarts the JVM if necessary on the first thread to ensure Mac compatibility
 		if (LWJGUIUtil.restartJVMOnFirstThread(true, program.getClass(), args)) {
 			return;
 		}
-		
-		//Fail to start the program if GLFW can't be initialized
-		if (!glfwInit()) throw new IllegalStateException("Unable to initialize GLFW");
 
-		//Create a standard opengl 3.2 window.
+		Font.initFonts();
+
+		// Fail to start the program if GLFW can't be initialized
+		if (!glfwInit())
+			throw new IllegalStateException("Unable to initialize GLFW");
+
+		// Create a standard opengl 3.2 window.
 		long windowID;
-		if ( ModernOpenGL )
+		if (ModernOpenGL)
 			windowID = LWJGUIUtil.createOpenGLCoreWindow("Window", 100, 100, true, false);
 		else
 			windowID = LWJGUIUtil.createOpenGLDepricatedWindow("Window", 100, 100, true, false);
-		
-		//Initialize LWJGUI for this window ID.
+
+		// Initialize LWJGUI for this window ID.
 		Window window = LWJGUI.initialize(windowID);
-		
-		//Initialize the program
+
+		// Initialize the program
 		program.start(args, window);
-		
-		//Run the program
+
+		// Run the program
 		program.loop(window);
-				
-		//Stop GLFW after the window closes.
+
+		// Stop GLFW after the window closes.
 		glfwTerminate();
-		
-		System.exit(0);
 	}
-	
+
 	private void loop(Window window) {
-		//Software loop
-		while (!GLFW.glfwWindowShouldClose(window.getContext().getWindowHandle())) {
-			//Run the program
+		// Software loop
+		while (LWJGUI.hasAnyWindow()) {
 			run();
-			
-			//Render the program
-			LWJGUI.render();
+			LWJGUI.update(60);
 		}
+		Font.disposeFonts();
 	}
-	
+
 	/**
-	 * Called after the basic GLFW/LWJGUI initialization is completed and before the program loop is started.
+	 * Called after the basic GLFW/LWJGUI initialization is completed and before the
+	 * program loop is started.
 	 * 
-	 * @param args - the args passed through the main method
+	 * @param args   - the args passed through the main method
 	 * @param window - the newly created LWGUI window
 	 */
 	public abstract void start(String[] args, Window window);

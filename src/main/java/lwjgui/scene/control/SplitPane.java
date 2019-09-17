@@ -9,7 +9,6 @@ import org.lwjgl.glfw.GLFW;
 import org.lwjgl.nanovg.NVGPaint;
 import org.lwjgl.nanovg.NanoVG;
 
-import lwjgui.LWJGUI;
 import lwjgui.collections.ObservableList;
 import lwjgui.event.ElementCallback;
 import lwjgui.geometry.Orientation;
@@ -18,7 +17,6 @@ import lwjgui.paint.Color;
 import lwjgui.scene.Context;
 import lwjgui.scene.Cursor;
 import lwjgui.scene.Node;
-import lwjgui.scene.Window;
 import lwjgui.scene.layout.StackPane;
 import lwjgui.theme.Theme;
 
@@ -26,12 +24,12 @@ public class SplitPane extends Control {
 	private Orientation orientation;
 	private ArrayList<Divider> dividers = new ArrayList<Divider>();
 	private ArrayList<DividerNode> divider_nodes = new ArrayList<DividerNode>();
-	private HashMap<Divider,Integer> divider_cache = new HashMap<Divider,Integer>();
+	private HashMap<Divider, Integer> divider_cache = new HashMap<Divider, Integer>();
 	private ObservableList<Node> items = new ObservableList<Node>();
 	private StackPane divider_holder;
 	private int dividerThickness = 6;
 
-	protected static HashMap<Node,Boolean> divider_resize = new HashMap<Node,Boolean>();
+	protected static HashMap<Node, Boolean> divider_resize = new HashMap<Node, Boolean>();
 
 	private Divider grabbedDivider;
 	private Divider hovered;
@@ -48,7 +46,7 @@ public class SplitPane extends Control {
 		this.items.setAddCallback(new ElementCallback<Node>() {
 			@Override
 			public void onEvent(Node changed) {
-				if ( divider_resize.get(changed) == null ) {
+				if (divider_resize.get(changed) == null) {
 					divider_resize.put(changed, true);
 				}
 				recalculateDividers();
@@ -70,14 +68,15 @@ public class SplitPane extends Control {
 	}
 
 	private double lastLen = 0;
+
 	@Override
 	protected void position(Node parent) {
 		double curLen = getWidth();
-		if ( !this.orientation.equals(Orientation.VERTICAL) ) {
+		if (!this.orientation.equals(Orientation.VERTICAL)) {
 			curLen = getHeight();
 		}
 
-		if ( curLen != lastLen ) {
+		if (curLen != lastLen) {
 			onSizeChange(lastLen);
 			lastLen = curLen;
 		}
@@ -87,29 +86,25 @@ public class SplitPane extends Control {
 	}
 
 	private void clickDividers() {
-		if ( hovered == null ) {
+		if (hovered == null) {
 			return;
 		}
 
-		Window window = LWJGUI.getWindowFromContext(GLFW.glfwGetCurrentContext());
-		Context context = window.getContext();
-		double mx = context.getMouseX();
-		double my = context.getMouseY();
+		double mx = cached_context.getMouseX();
+		double my = cached_context.getMouseY();
 
 		grabbedDivider = hovered;
 		mouseGrabLocation.set(mx, my);
 	}
 
 	private Divider getDividerUnderMouse() {
-		Window window = LWJGUI.getWindowFromContext(GLFW.glfwGetCurrentContext());
-		Context context = window.getContext();
-		double mx = context.getMouseX();
-		double my = context.getMouseY();
+		double mx = cached_context.getMouseX();
+		double my = cached_context.getMouseY();
 
 		for (int i = 0; i < dividers.size(); i++) {
 			Divider d = dividers.get(i);
 			Vector4d bounds = getDividerBounds(d);
-			if ( mx > bounds.x && mx < bounds.x+bounds.z && my > bounds.y && my < bounds.y+bounds.w) {
+			if (mx > bounds.x && mx < bounds.x + bounds.z && my > bounds.y && my < bounds.y + bounds.w) {
 				return d;
 			}
 		}
@@ -120,46 +115,45 @@ public class SplitPane extends Control {
 	private boolean click = false;
 	private boolean released = true;
 	private Vector2d mouseGrabLocation = new Vector2d();
+
 	private void grabDividers() {
 
 		// Get mouse pressed
 		int mouse = GLFW.glfwGetMouseButton(GLFW.glfwGetCurrentContext(), GLFW.GLFW_MOUSE_BUTTON_LEFT);
 
 		// Check if we're clicking
-		if ( !click && mouse == GLFW.GLFW_PRESS && released )
+		if (!click && mouse == GLFW.GLFW_PRESS && released)
 			click = true;
-		else if ( click && mouse == GLFW.GLFW_PRESS) {
+		else if (click && mouse == GLFW.GLFW_PRESS) {
 			released = false;
 			click = false;
-		} else if ( mouse != GLFW.GLFW_PRESS )
+		} else if (mouse != GLFW.GLFW_PRESS)
 			released = true;
 
-		if ( click ) {
+		if (click) {
 			clickDividers();
 		}
 
-		if ( grabbedDivider == null )
+		if (grabbedDivider == null)
 			return;
 
 		// If mouse not pressed, not holding divider
-		if ( mouse != GLFW.GLFW_PRESS ) {
+		if (mouse != GLFW.GLFW_PRESS) {
 			grabbedDivider = null;
 			return;
 		}
 
 		// Get mouse coordinates
-		Window window = LWJGUI.getWindowFromContext(GLFW.glfwGetCurrentContext());
-		Context context = window.getContext();
-		double mx = context.getMouseX() - mouseGrabLocation.x;
-		double my = context.getMouseY() - mouseGrabLocation.y;
+		double mx = cached_context.getMouseX() - mouseGrabLocation.x;
+		double my = cached_context.getMouseY() - mouseGrabLocation.y;
 
 		// If we're holding onto a divider
 		double pChange = pixelSpaceToDividerSpace(mx);
-		if ( this.orientation == Orientation.HORIZONTAL ) 
+		if (this.orientation == Orientation.HORIZONTAL)
 			pChange = pixelSpaceToDividerSpace(my);
 
-		this.setDividerPosition(divider_cache.get(grabbedDivider), grabbedDivider.position+pChange);
-		mouseGrabLocation.add(mx, my); 
+		this.setDividerPosition(divider_cache.get(grabbedDivider), grabbedDivider.position + pChange);
+		mouseGrabLocation.add(mx, my);
 
 		for (int i = 0; i < 4; i++) {
 			this.updateChildren();
@@ -175,43 +169,43 @@ public class SplitPane extends Control {
 			Divider rightDivider = null;
 
 			// Has a left divider
-			if ( i > 0 ) {
-				leftDivider = this.dividers.get(i-1);
+			if (i > 0) {
+				leftDivider = this.dividers.get(i - 1);
 			}
 			// Has a right divider
-			if ( i < divider_nodes.size()-1 ) {
+			if (i < divider_nodes.size() - 1) {
 				rightDivider = this.dividers.get(i);
 			}
 
 			// Check if the divider needs to be resized
 			boolean resize = true;
-			if ( d.getChildren().size() > 0 ) {
+			if (d.getChildren().size() > 0) {
 				resize = divider_resize.get(d.getChildren().get(0));
 			}
 
 			// If not (static divider), then make sure it stays the same length
-			if ( !resize ) {
-				resizeDiv( leftDivider, d, lastLength );
-				resizeDiv( rightDivider, d, lastLength );
+			if (!resize) {
+				resizeDiv(leftDivider, d, lastLength);
+				resizeDiv(rightDivider, d, lastLength);
 			}
 		}
 	}
 
 	private void resizeDiv(Divider div, DividerNode node, double lastLength) {
-		if ( div == null || lastLength == 0)
+		if (div == null || lastLength == 0)
 			return;
 
-		double lastOff = this.pixelSpaceToDividerSpace(div.position*lastLength);
+		double lastOff = this.pixelSpaceToDividerSpace(div.position * lastLength);
 		int divIndex = getDividerIndex(div);
-		if ( divIndex == dividers.size()-1) {
-			lastOff = 1.0 - this.pixelSpaceToDividerSpace((1.0-div.position)*lastLength);
+		if (divIndex == dividers.size() - 1) {
+			lastOff = 1.0 - this.pixelSpaceToDividerSpace((1.0 - div.position) * lastLength);
 		}
 		setDividerPosition(divIndex, lastOff);
 	}
 
 	private int getDividerIndex(Divider div) {
 		for (int i = 0; i < dividers.size(); i++) {
-			if ( dividers.get(i).equals(div) ) {
+			if (dividers.get(i).equals(div)) {
 				return i;
 			}
 		}
@@ -219,12 +213,12 @@ public class SplitPane extends Control {
 	}
 
 	@Override
-	protected void resize() {		
+	protected void resize() {
 		super.resize();
 
 		float filledLen = 0;
 		double maxLen = this.getWidth();
-		if ( this.orientation.equals(Orientation.HORIZONTAL) ) {
+		if (this.orientation.equals(Orientation.HORIZONTAL)) {
 			maxLen = this.getHeight();
 		}
 
@@ -237,26 +231,26 @@ public class SplitPane extends Control {
 			Divider rightDivider = null;
 
 			// Has a left divider
-			if ( i > 0 ) {
-				leftDivider = this.dividers.get(i-1);
+			if (i > 0) {
+				leftDivider = this.dividers.get(i - 1);
 				left = leftDivider.position;
-				subt += dividerThickness/2f;
+				subt += dividerThickness / 2f;
 			}
 			// Has a right divider
-			if ( i < divider_nodes.size()-1 ) {
+			if (i < divider_nodes.size() - 1) {
 				rightDivider = this.dividers.get(i);
 				right = rightDivider.position;
-				subt += dividerThickness/2f;
+				subt += dividerThickness / 2f;
 			}
 
 			// Calculate length of divider node
-			double len = ((right-left)*maxLen) - subt;
-			double t = Math.ceil(len-0.25); // Round up to eliminate rounding issues.
+			double len = ((right - left) * maxLen) - subt;
+			double t = Math.ceil(len - 0.25); // Round up to eliminate rounding issues.
 
-			if ( d.getChildren().size() > 0 )
+			if (d.getChildren().size() > 0)
 				d.setAlignment(d.getChildren().get(0).getAlignment());
 
-			if ( this.orientation.equals(Orientation.VERTICAL) ) {
+			if (this.orientation.equals(Orientation.VERTICAL)) {
 				d.setFillToParentWidth(false);
 				d.setFillToParentHeight(true);
 				d.setPrefWidth(t);
@@ -271,7 +265,7 @@ public class SplitPane extends Control {
 				d.setMaxHeight(t);
 				d.setLocalPosition(divider_holder, 0, filledLen);
 			}
-			
+
 			this.updateChildrenLocalRecursive();
 
 			filledLen += len + dividerThickness;
@@ -282,7 +276,7 @@ public class SplitPane extends Control {
 		return items;
 	}
 
-	public void setOrientation( Orientation orientation ) {
+	public void setOrientation(Orientation orientation) {
 		this.orientation = orientation;
 
 		// Re add dividers into holder
@@ -298,13 +292,13 @@ public class SplitPane extends Control {
 		double percent = d.getPosition();
 		int dividerWidth = dividerThickness;
 		int dividerHeight = (int) getHeight();
-		int dividerX = (int) ((getX() + getWidth()*percent)-(dividerThickness/2d));
+		int dividerX = (int) ((getX() + getWidth() * percent) - (dividerThickness / 2d));
 		int dividerY = (int) getY();
-		if ( orientation.equals(Orientation.HORIZONTAL) ) {
+		if (orientation.equals(Orientation.HORIZONTAL)) {
 			dividerWidth = (int) getWidth();
 			dividerHeight = dividerThickness;
-			dividerX = (int) getX();	
-			dividerY = (int) ((getY() + getHeight()*percent)-(dividerThickness/2d));
+			dividerX = (int) getX();
+			dividerY = (int) ((getY() + getHeight() * percent) - (dividerThickness / 2d));
 		}
 
 		return new Vector4d(dividerX, dividerY, dividerWidth, dividerHeight);
@@ -313,16 +307,16 @@ public class SplitPane extends Control {
 	private void recalculateDividers() {
 		this.divider_cache.clear();
 		ArrayList<Divider> t = new ArrayList<Divider>();
-		int amtDiv = this.items.size()-1;
+		int amtDiv = this.items.size() - 1;
 		for (int i = 0; i < amtDiv; i++) {
 			Divider d = new Divider();
-			d.setPosition((i+1)/(double)(amtDiv+1));
+			d.setPosition((i + 1) / (double) (amtDiv + 1));
 			t.add(d);
 			this.divider_cache.put(d, i);
 		}
 		dividers = t;
 
-		synchronized(divider_nodes) {
+		synchronized (divider_nodes) {
 			this.divider_holder.getChildren().clear();
 			this.divider_nodes.clear();
 			for (int i = 0; i < items.size(); i++) {
@@ -333,28 +327,25 @@ public class SplitPane extends Control {
 		}
 
 		resize();
-		/*ObservableList<Node> n = new ObservableList<Node>();
-		ObservableList<Node> old = this.children;
-		for (int i = 0; i < old.size(); i++) {
-			n.add(old.get(i));
-		}
-		for (int i = 0; i < t.size(); i++) {
-			n.add(new DividerNode(t.get(i)));
-		}
-		this.divider_cache = n;*/
+		/*
+		 * ObservableList<Node> n = new ObservableList<Node>(); ObservableList<Node> old
+		 * = this.children; for (int i = 0; i < old.size(); i++) { n.add(old.get(i)); }
+		 * for (int i = 0; i < t.size(); i++) { n.add(new DividerNode(t.get(i))); }
+		 * this.divider_cache = n;
+		 */
 	}
 
 	private double pixelSpaceToDividerSpace(double mx) {
 		double maxLen = getWidth();
-		if ( this.orientation.equals(Orientation.HORIZONTAL) )
+		if (this.orientation.equals(Orientation.HORIZONTAL))
 			maxLen = getHeight();
 
-		return mx/maxLen;
+		return mx / maxLen;
 	}
 
 	@Deprecated
 	private Divider lastHovered;
-	
+
 	@Override
 	public void render(Context context) {
 		long vg = context.getNVG();
@@ -378,69 +369,73 @@ public class SplitPane extends Control {
 			Color col = Theme.current().getControlOutline();
 			NanoVG.nnvgBeginPath(vg);
 			NanoVG.nvgFillColor(vg, col.getNVG());
-			NanoVG.nvgRect(vg, (int)bounds.x, (int)bounds.y, (int)bounds.z, (int)bounds.w);
+			NanoVG.nvgRect(vg, (int) bounds.x, (int) bounds.y, (int) bounds.z, (int) bounds.w);
 			NanoVG.nvgFill(vg);
 
-			Cursor desiredCursor = orientation.equals(Orientation.VERTICAL)?Cursor.HRESIZE:Cursor.VRESIZE;
-			if ( hovered != null ) {
+			Cursor desiredCursor = orientation.equals(Orientation.VERTICAL) ? Cursor.HRESIZE : Cursor.VRESIZE;
+			if (hovered != null) {
 				getScene().setCursor(desiredCursor);
-			} else if ( lastHovered != null ) {
-				if ( getScene().getCursor().equals(desiredCursor) ) {
+			} else if (lastHovered != null) {
+				if (getScene().getCursor().equals(desiredCursor)) {
 					getScene().setCursor(Cursor.NORMAL);
 				}
 			}
 			lastHovered = hovered;
 
 			// Inner Gradient
-			NanoVG.nvgTranslate(vg, (int)bounds.x, (int)bounds.y);
-			if ( this.orientation.equals(Orientation.VERTICAL) ) {
-				NVGPaint bg = NanoVG.nvgLinearGradient(vg, 0, 0, (int)bounds.z, 0, Theme.current().getControlHover().getNVG(), Theme.current().getControlOutline().getNVG(), NVGPaint.calloc());
+			NanoVG.nvgTranslate(vg, (int) bounds.x, (int) bounds.y);
+			if (this.orientation.equals(Orientation.VERTICAL)) {
+				NVGPaint bg = NanoVG.nvgLinearGradient(vg, 0, 0, (int) bounds.z, 0,
+						Theme.current().getControlHover().getNVG(), Theme.current().getControlOutline().getNVG(),
+						NVGPaint.calloc());
 				NanoVG.nvgBeginPath(vg);
-				NanoVG.nvgRect(vg, 1, 0, (int)bounds.z-2,(int)bounds.w);
+				NanoVG.nvgRect(vg, 1, 0, (int) bounds.z - 2, (int) bounds.w);
 				NanoVG.nvgFillPaint(vg, bg);
 				NanoVG.nvgFill(vg);
 			} else {
-				NVGPaint bg = NanoVG.nvgLinearGradient(vg, 0, 0, 0, (int)bounds.w, Theme.current().getControlHover().getNVG(), Theme.current().getControlOutline().getNVG(), NVGPaint.calloc());
+				NVGPaint bg = NanoVG.nvgLinearGradient(vg, 0, 0, 0, (int) bounds.w,
+						Theme.current().getControlHover().getNVG(), Theme.current().getControlOutline().getNVG(),
+						NVGPaint.calloc());
 				NanoVG.nvgBeginPath(vg);
-				NanoVG.nvgRect(vg, 0, 1, (int)bounds.z,(int)bounds.w-2);
+				NanoVG.nvgRect(vg, 0, 1, (int) bounds.z, (int) bounds.w - 2);
 				NanoVG.nvgFillPaint(vg, bg);
 				NanoVG.nvgFill(vg);
 			}
-			NanoVG.nvgTranslate(vg, (int)-bounds.x, (int)-bounds.y);
+			NanoVG.nvgTranslate(vg, (int) -bounds.x, (int) -bounds.y);
 		}
 
 		Color outlineColor = Theme.current().getControlOutline();
 		NanoVG.nvgBeginPath(vg);
-		NanoVG.nvgRect(vg, (int)this.getX(), (int)this.getY(), (int)getWidth(), (int)getHeight());
+		NanoVG.nvgRect(vg, (int) this.getX(), (int) this.getY(), (int) getWidth(), (int) getHeight());
 		NanoVG.nvgStrokeColor(vg, outlineColor.getNVG());
 		NanoVG.nvgStrokeWidth(vg, 1f);
 		NanoVG.nvgStroke(vg);
 	}
 
-	public void setDividerPosition( int index, double position ) {
+	public void setDividerPosition(int index, double position) {
 		Divider d = dividers.get(index);
 
 		// Get left/right dividers
 		Divider left = null;
 		Divider right = null;
-		if ( index > 0 ) 
-			left = dividers.get(index-1);
-		if ( index < dividers.size()-1 )
-			right = dividers.get(index+1);
+		if (index > 0)
+			left = dividers.get(index - 1);
+		if (index < dividers.size() - 1)
+			right = dividers.get(index + 1);
 
 		// Get divider thickness in divider space
 		double dthick = pixelSpaceToDividerSpace(dividerThickness);
 
 		// Get min max bounds
-		double minPos = dthick/2d;
-		double maxPos = 1-dthick/2d;
-		if ( left != null )
-			minPos = left.position+dthick;
-		if ( right != null )
-			maxPos = right.position-dthick;
+		double minPos = dthick / 2d;
+		double maxPos = 1 - dthick / 2d;
+		if (left != null)
+			minPos = left.position + dthick;
+		if (right != null)
+			maxPos = right.position - dthick;
 
 		// Clamp position
-		position = Math.min( maxPos, Math.max(minPos, position) );
+		position = Math.min(maxPos, Math.max(minPos, position));
 
 		// Set position
 		d.position = position;
@@ -452,10 +447,12 @@ public class SplitPane extends Control {
 
 	/**
 	 * Represents a single divider in the SplitPane.
+	 * 
 	 * @since JavaFX 2.0
 	 */
 	public static class Divider {
 		private double position = 0.5;
+
 		public final void setPosition(double value) {
 			position = value;
 		}
